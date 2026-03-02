@@ -57,3 +57,4 @@ project:
 site:
   template: book-theme
   title: Quantitative MRI Course
+  url: https://mathieuboudreau.github.io/test-myst
