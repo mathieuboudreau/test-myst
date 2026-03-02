@@ -335,10 +335,8 @@ inhomogeneity.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(4)
 
@@ -395,24 +393,23 @@ T1_no_b1   = np.clip(vfa_t1(imgs, FA_rad, TR), 100, 6000)
 # With B1 correction: use measured B1m to correct flip angles
 T1_with_b1 = np.clip(vfa_t1(imgs, FA_rad * B1m[np.newaxis, ...], TR), 100, 6000)
 
-fig, axes = plt.subplots(1, 5, figsize=(17, 3.8))
-for ax, img, fa in zip(axes[:3], imgs, FA_deg):
-    ax.imshow(img, cmap='gray', vmin=0, vmax=0.50, interpolation='bilinear')
-    ax.set_title(f'α = {int(fa)}°', fontsize=9); ax.axis('off')
-
-for ax, data, title in zip(axes[3:],
-                            [T1_no_b1, T1_with_b1],
-                            ['VFA T1 (no B1 corr.)', 'VFA T1 (B1 corrected)']):
-    im = ax.imshow(data, cmap='magma', vmin=400, vmax=4500, interpolation='bilinear')
-    ax.set_title(title, fontsize=9); ax.axis('off')
-    div = make_axes_locatable(ax)
-    cax = div.append_axes('right', size='5%', pad=0.04)
-    plt.colorbar(im, cax=cax, label='T1 (ms)')
-
-fig.suptitle(f'VFA Brain Maps  (TR = {int(TR)} ms, α = {list(FA_deg.astype(int))}°)',
-             fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = [f'α = {int(fa)}°' for fa in FA_deg] + ['VFA T1 (no B1 corr.)', 'VFA T1 (B1 corrected)']
+fig = make_subplots(rows=1, cols=5, subplot_titles=titles, horizontal_spacing=0.04)
+for i, img in enumerate(imgs, 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.50, showscale=False), row=1, col=i)
+for i, data in enumerate([T1_no_b1, T1_with_b1], 4):
+    fig.add_trace(go.Heatmap(z=np.flipud(data), colorscale='Magma',
+                             zmin=400, zmax=4500, showscale=(i == 5),
+                             colorbar=dict(title='T1 (ms)', len=0.75, thickness=15)),
+                 row=1, col=i)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text=f'VFA Brain Maps  (TR = {int(TR)} ms, α = {list(FA_deg.astype(int))}°)', x=0.5),
+    height=280, template='plotly_white',
+)
+fig.show()
 ```
 
 The uncorrected T1 map (fourth panel) shows a concentric ring artefact:

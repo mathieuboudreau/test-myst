@@ -386,10 +386,8 @@ fraction $F$ and the free-pool relaxation rate $R_1^a = 1/T_1^a$.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(10)
 
@@ -436,31 +434,24 @@ MTR_map = np.where(bmask & (img_s0 > 0.01), (1 - img_smt/img_s0)*100, np.nan)
 F_fit = np.where(bmask, Fm + rng.normal(0, 0.004, Fm.shape), np.nan)
 R1a_fit = np.where(bmask, 1000.0/T1m + rng.normal(0, 0.02, T1m.shape), np.nan)
 
-fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
-im0 = axes[0].imshow(MTR_map, cmap='viridis', vmin=0, vmax=60,
-                     interpolation='bilinear')
-axes[0].set_title('MTR (%)', fontsize=10); axes[0].axis('off')
-div0 = make_axes_locatable(axes[0])
-cax0 = div0.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im0, cax=cax0, label='MTR (%)')
-
-im1 = axes[1].imshow(F_fit, cmap='plasma', vmin=0, vmax=0.18,
-                     interpolation='bilinear')
-axes[1].set_title('qMT  F  (bound pool fraction)', fontsize=9); axes[1].axis('off')
-div1 = make_axes_locatable(axes[1])
-cax1 = div1.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im1, cax=cax1, label='F')
-
-im2 = axes[2].imshow(R1a_fit, cmap='hot', vmin=0.1, vmax=1.8,
-                     interpolation='bilinear')
-axes[2].set_title('qMT  R₁ᵃ  (s⁻¹)', fontsize=10); axes[2].axis('off')
-div2 = make_axes_locatable(axes[2])
-cax2 = div2.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im2, cax=cax2, label='R₁ᵃ (s⁻¹)')
-
-fig.suptitle('qMT Brain Maps', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = ['MTR (%)', 'qMT F (bound pool fraction)', 'qMT R₁ᵃ (s⁻¹)']
+fig = make_subplots(rows=1, cols=3, subplot_titles=titles, horizontal_spacing=0.10)
+fig.add_trace(go.Heatmap(z=np.flipud(MTR_map), colorscale='Viridis',
+                         zmin=0, zmax=60, showscale=True,
+                         colorbar=dict(title='MTR (%)', len=0.75, thickness=15, x=0.31)),
+              row=1, col=1)
+fig.add_trace(go.Heatmap(z=np.flipud(F_fit), colorscale='Plasma',
+                         zmin=0, zmax=0.18, showscale=True,
+                         colorbar=dict(title='F', len=0.75, thickness=15, x=0.65)),
+              row=1, col=2)
+fig.add_trace(go.Heatmap(z=np.flipud(R1a_fit), colorscale='Hot',
+                         zmin=0.1, zmax=1.8, showscale=True,
+                         colorbar=dict(title='R₁ᵃ (s⁻¹)', len=0.75, thickness=15)),
+              row=1, col=3)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(title=dict(text='qMT Brain Maps', x=0.5), height=320, template='plotly_white')
+fig.show()
 ```
 
 The bound pool fraction $F$ (centre) is highest in WM (~13%) due to

@@ -326,10 +326,8 @@ vectorised log-linear fit recovers the T2 map.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(8)
 
@@ -371,21 +369,22 @@ Xpinv  = np.linalg.pinv(X)
 coeffs = Xpinv @ S_log
 T2_fit = np.where(bmask, np.clip(-1.0 / coeffs[1].reshape(n, n), 10, 3000), np.nan)
 
-fig, axes = plt.subplots(1, 6, figsize=(19, 3.8))
-for ax, img, tau in zip(axes[:5], imgs, tau_pts):
-    ax.imshow(img, cmap='gray', vmin=0, vmax=0.90, interpolation='bilinear')
-    ax.set_title(f'τ = {int(tau)} ms', fontsize=9); ax.axis('off')
-
-im = axes[5].imshow(T2_fit, cmap='inferno', vmin=30, vmax=300,
-                    interpolation='bilinear')
-axes[5].set_title('T2prep T2 map', fontsize=9); axes[5].axis('off')
-div = make_axes_locatable(axes[5])
-cax = div.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im, cax=cax, label='T2 (ms)')
-
-fig.suptitle('T2prep Brain Maps  (five T2prep durations)', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = [f'τ = {int(tau)} ms' for tau in tau_pts] + ['T2prep T2 map']
+fig = make_subplots(rows=1, cols=6, subplot_titles=titles, horizontal_spacing=0.03)
+for i, (img, tau) in enumerate(zip(imgs, tau_pts), 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.90, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(T2_fit), colorscale='Inferno',
+                         zmin=30, zmax=300, showscale=True,
+                         colorbar=dict(title='T2 (ms)', len=0.75, thickness=15)),
+              row=1, col=6)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text='T2prep Brain Maps  (five T2prep durations)', x=0.5),
+    height=280, template='plotly_white',
+)
+fig.show()
 ```
 
 At τ = 0 ms the image is PD-weighted with no T2 encoding. As τ

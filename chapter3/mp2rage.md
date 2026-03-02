@@ -360,10 +360,8 @@ contrast ratio, and the final T1 map obtained by LUT inversion.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(5)
 
@@ -418,31 +416,27 @@ den_lut = (np.sin(a1)**2 * (1 - 2*np.exp(-TI1/T1_lut))**2
 mp2_lut = np.where(den_lut > 1e-9, mp2_lut / den_lut, 0.0)
 T1_mp2  = np.where(bmask, np.interp(mp2_map, mp2_lut, T1_lut), np.nan)
 
-fig, axes = plt.subplots(1, 4, figsize=(14, 3.8))
-axes[0].imshow(gre1, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
-axes[0].set_title(f'GRE₁  (TI = {TI1} ms)', fontsize=9); axes[0].axis('off')
-axes[1].imshow(gre2, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
-axes[1].set_title(f'GRE₂  (TI = {TI2} ms)', fontsize=9); axes[1].axis('off')
-
-im_mp2 = axes[2].imshow(np.where(bmask, mp2_map, np.nan),
-                         cmap='RdBu_r', vmin=-0.5, vmax=0.5,
-                         interpolation='bilinear')
-axes[2].set_title('MP2RAGE contrast', fontsize=9); axes[2].axis('off')
-div2 = make_axes_locatable(axes[2])
-cax2 = div2.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im_mp2, cax=cax2)
-
-im_t1 = axes[3].imshow(T1_mp2, cmap='magma', vmin=400, vmax=4500,
-                        interpolation='bilinear')
-axes[3].set_title('MP2RAGE T1 map', fontsize=9); axes[3].axis('off')
-div3 = make_axes_locatable(axes[3])
-cax3 = div3.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im_t1, cax=cax3, label='T1 (ms)')
-
-fig.suptitle(f'MP2RAGE Brain Maps  (TI₁={TI1} ms, TI₂={TI2} ms,'
-             f' α₁={a1_deg}°, α₂={a2_deg}°)', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+mp2_masked = np.where(bmask, mp2_map, np.nan)
+titles = [f'GRE₁  (TI = {TI1} ms)', f'GRE₂  (TI = {TI2} ms)', 'MP2RAGE contrast', 'MP2RAGE T1 map']
+fig = make_subplots(rows=1, cols=4, subplot_titles=titles, horizontal_spacing=0.06)
+for i, img in enumerate([gre1, gre2], 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.5, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(mp2_masked), colorscale='RdBu',
+                         zmin=-0.5, zmax=0.5, showscale=True,
+                         colorbar=dict(title='contrast', len=0.75, thickness=15, x=0.76)),
+              row=1, col=3)
+fig.add_trace(go.Heatmap(z=np.flipud(T1_mp2), colorscale='Magma',
+                         zmin=400, zmax=4500, showscale=True,
+                         colorbar=dict(title='T1 (ms)', len=0.75, thickness=15)),
+              row=1, col=4)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text=f'MP2RAGE Brain Maps  (TI₁={TI1} ms, TI₂={TI2} ms, α₁={a1_deg}°, α₂={a2_deg}°)', x=0.5),
+    height=280, template='plotly_white',
+)
+fig.show()
 ```
 
 The GRE₁ image (TI = 800 ms) shows tissues that have passed their

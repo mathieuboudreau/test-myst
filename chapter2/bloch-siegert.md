@@ -377,10 +377,8 @@ magnitude image, the BS phase difference map, and the recovered B1 map.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(2)
 
@@ -418,28 +416,30 @@ re = img_mag + rng.normal(0, 0.02, img_mag.shape)
 im_noise = rng.normal(0, 0.02, img_mag.shape)
 img_mag_n = np.sqrt(re**2 + im_noise**2)
 
-fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
-axes[0].imshow(img_mag_n, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
-axes[0].set_title('Magnitude image', fontsize=10); axes[0].axis('off')
-
 pd_show = np.where(bmask, phi_diff, np.nan)
-im2 = axes[1].imshow(pd_show, cmap='bwr', vmin=-2*KBS, vmax=2*KBS,
-                     interpolation='bilinear')
-axes[1].set_title('BS phase difference (rad)', fontsize=10); axes[1].axis('off')
-div1 = make_axes_locatable(axes[1])
-cax1 = div1.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im2, cax=cax1, label='rad')
+titles = ['Magnitude image', 'BS phase difference (rad)', 'BS B1 map']
+fig = make_subplots(rows=1, cols=3, subplot_titles=titles, horizontal_spacing=0.08)
 
-im3 = axes[2].imshow(B1_bs, cmap='RdBu_r', vmin=0.7, vmax=1.3,
-                     interpolation='bilinear')
-axes[2].set_title('BS B1 map', fontsize=10); axes[2].axis('off')
-div2 = make_axes_locatable(axes[2])
-cax2 = div2.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im3, cax=cax2, label='B1 factor')
+fig.add_trace(go.Heatmap(z=np.flipud(img_mag_n), colorscale='gray',
+                         zmin=0, zmax=0.5, showscale=False), row=1, col=1)
 
-fig.suptitle(f'Bloch-Siegert Brain Maps', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+fig.add_trace(go.Heatmap(z=np.flipud(pd_show), colorscale='RdBu',
+                         zmin=-2*KBS, zmax=2*KBS, showscale=True,
+                         colorbar=dict(title='rad', len=0.75, thickness=15, x=0.63)),
+              row=1, col=2)
+
+fig.add_trace(go.Heatmap(z=np.flipud(B1_bs), colorscale='RdBu',
+                         zmin=0.7, zmax=1.3, showscale=True,
+                         colorbar=dict(title='B1 factor', len=0.75, thickness=15)),
+              row=1, col=3)
+
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text='Bloch-Siegert Brain Maps', x=0.5),
+    height=320, template='plotly_white',
+)
+fig.show()
 ```
 
 The phase difference map (centre panel) directly encodes B1²: the

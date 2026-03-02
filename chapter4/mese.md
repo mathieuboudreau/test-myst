@@ -297,10 +297,8 @@ A vectorised log-linear fit recovers the T2 map.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(6)
 
@@ -342,22 +340,23 @@ Xpinv  = np.linalg.pinv(X)          # (2, N_TE)
 coeffs = Xpinv @ S_log              # (2, n²)
 T2_fit = np.where(bmask, np.clip(-1.0 / coeffs[1].reshape(n, n), 10, 3000), np.nan)
 
-show_idx = [0, 1, 3, 5]   # TE = 15, 30, 90, 150 ms
-fig, axes = plt.subplots(1, 5, figsize=(17, 3.8))
-for ax, k in zip(axes[:4], show_idx):
-    ax.imshow(imgs[k], cmap='gray', vmin=0, vmax=0.90, interpolation='bilinear')
-    ax.set_title(f'TE = {int(TE_pts[k])} ms', fontsize=9); ax.axis('off')
-
-im = axes[4].imshow(T2_fit, cmap='inferno', vmin=30, vmax=300,
-                    interpolation='bilinear')
-axes[4].set_title('MESE T2 map', fontsize=9); axes[4].axis('off')
-div = make_axes_locatable(axes[4])
-cax = div.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im, cax=cax, label='T2 (ms)')
-
-fig.suptitle('MESE Brain Maps  (TE spacing = 15 ms)', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+show_idx = [0, 1, 3, 5]
+titles = [f'TE = {int(TE_pts[k])} ms' for k in show_idx] + ['MESE T2 map']
+fig = make_subplots(rows=1, cols=5, subplot_titles=titles, horizontal_spacing=0.04)
+for i, k in enumerate(show_idx, 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(imgs[k]), colorscale='gray',
+                             zmin=0, zmax=0.90, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(T2_fit), colorscale='Inferno',
+                         zmin=30, zmax=300, showscale=True,
+                         colorbar=dict(title='T2 (ms)', len=0.75, thickness=15)),
+              row=1, col=5)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text='MESE Brain Maps  (TE spacing = 15 ms)', x=0.5),
+    height=280, template='plotly_white',
+)
+fig.show()
 ```
 
 Signal decays fastest in WM (T2 ≈ 75 ms): by TE = 150 ms WM is nearly

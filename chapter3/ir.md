@@ -313,10 +313,8 @@ brain phantom and recovers a T1 map using a template-matching look-up table.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(3)
 
@@ -362,20 +360,22 @@ dp      = tmpls_n.T @ S_n     # (400, n²)
 T1_fit  = T1_lut[dp.argmax(0)].reshape(n, n)
 T1_fit  = np.where(bmask, T1_fit, np.nan)
 
-fig, axes = plt.subplots(1, 5, figsize=(17, 3.8))
-for ax, img, ti in zip(axes[:4], imgs, TI_pts):
-    ax.imshow(img, cmap='gray', vmin=0, vmax=0.9, interpolation='bilinear')
-    ax.set_title(f'TI = {int(ti)} ms', fontsize=9); ax.axis('off')
-im = axes[4].imshow(T1_fit, cmap='magma', vmin=400, vmax=4500,
-                    interpolation='bilinear')
-axes[4].set_title('IR T1 map', fontsize=9); axes[4].axis('off')
-div = make_axes_locatable(axes[4])
-cax = div.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im, cax=cax, label='T1 (ms)')
-
-fig.suptitle('Inversion Recovery Brain Maps  (TR = 10 000 ms)', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = [f'TI = {int(ti)} ms' for ti in TI_pts] + ['IR T1 map']
+fig = make_subplots(rows=1, cols=5, subplot_titles=titles, horizontal_spacing=0.04)
+for i, img in enumerate(imgs, 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.9, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(T1_fit), colorscale='Magma',
+                         zmin=400, zmax=4500, showscale=True,
+                         colorbar=dict(title='T1 (ms)', len=0.75, thickness=15)),
+              row=1, col=5)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text='Inversion Recovery Brain Maps  (TR = 10 000 ms)', x=0.5),
+    height=280, template='plotly_white',
+)
+fig.show()
 ```
 
 At TI = 400 ms the WM (T1 ≈ 840 ms) and GM (T1 ≈ 1300 ms) have both

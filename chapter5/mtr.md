@@ -311,10 +311,8 @@ pixelwise MTR map is computed.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(9)
 
@@ -355,22 +353,22 @@ img_smt = rician(S0_ref * (1 - MTRtm) * bmask, 0.020)
 MTR_map = np.where(bmask & (img_s0 > 0.01),
                    (1 - img_smt / img_s0) * 100, np.nan)
 
-fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
-axes[0].imshow(img_s0,  cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
-axes[0].set_title('S₀ (no saturation)', fontsize=10); axes[0].axis('off')
-axes[1].imshow(img_smt, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
-axes[1].set_title('S_MT (with saturation)', fontsize=10); axes[1].axis('off')
-im = axes[2].imshow(MTR_map, cmap='viridis', vmin=0, vmax=60,
-                    interpolation='bilinear')
-axes[2].set_title('MTR map', fontsize=10); axes[2].axis('off')
-div = make_axes_locatable(axes[2])
-cax = div.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im, cax=cax, label='MTR (%)')
-
-fig.suptitle(f'MTR Brain Maps  (TR = {int(TR)} ms, α = {int(fa_deg)}°)',
-             fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = ['S₀ (no saturation)', 'S_MT (with saturation)', 'MTR map']
+fig = make_subplots(rows=1, cols=3, subplot_titles=titles, horizontal_spacing=0.06)
+for i, img in enumerate([img_s0, img_smt], 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.5, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(MTR_map), colorscale='Viridis',
+                         zmin=0, zmax=60, showscale=True,
+                         colorbar=dict(title='MTR (%)', len=0.75, thickness=15)),
+              row=1, col=3)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text=f'MTR Brain Maps  (TR = {int(TR)} ms, α = {int(fa_deg)}°)', x=0.5),
+    height=320, template='plotly_white',
+)
+fig.show()
 ```
 
 The MT-saturated image (S_MT) has lower overall signal than S₀, with

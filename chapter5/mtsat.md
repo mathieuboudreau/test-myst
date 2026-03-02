@@ -397,10 +397,8 @@ MTsat formula is applied to produce the MTsat map.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(11)
 
@@ -457,23 +455,22 @@ MTsat_map = np.where(bmask & (A_approx > 0.0001),
                       - fa_mt_rad**2 / 2) * 100, np.nan)
 MTsat_map = np.clip(MTsat_map, 0, 5)
 
-fig, axes = plt.subplots(1, 4, figsize=(14, 3.8))
-for ax, img, title in zip(axes[:3],
-                           [S_pd, S_t1, S_mt],
-                           ['S_PD  (PD-w)', 'S_T1  (T1-w)', 'S_MT  (MT-w)']):
-    ax.imshow(img, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
-    ax.set_title(title, fontsize=10); ax.axis('off')
-
-im = axes[3].imshow(MTsat_map, cmap='YlOrRd', vmin=0, vmax=3.5,
-                    interpolation='bilinear')
-axes[3].set_title('MTsat map', fontsize=10); axes[3].axis('off')
-div = make_axes_locatable(axes[3])
-cax = div.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im, cax=cax, label='MTsat (%)')
-
-fig.suptitle('MTsat Brain Maps  (three-contrast Helms protocol)', fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = ['S_PD  (PD-w)', 'S_T1  (T1-w)', 'S_MT  (MT-w)', 'MTsat map']
+fig = make_subplots(rows=1, cols=4, subplot_titles=titles, horizontal_spacing=0.05)
+for i, img in enumerate([S_pd, S_t1, S_mt], 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.5, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(MTsat_map), colorscale='YlOrRd',
+                         zmin=0, zmax=3.5, showscale=True,
+                         colorbar=dict(title='MTsat (%)', len=0.75, thickness=15)),
+              row=1, col=4)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text='MTsat Brain Maps  (three-contrast Helms protocol)', x=0.5),
+    height=300, template='plotly_white',
+)
+fig.show()
 ```
 
 WM has the highest MTsat (~2.2%) due to its myelin content, while CSF

@@ -311,10 +311,8 @@ displays the two source images and the recovered B1 map.
 :tags: [hide-input]
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 rng = np.random.default_rng(0)
 
@@ -361,25 +359,22 @@ B1_dam = np.where(bmask,
                   np.degrees(np.arccos(np.clip(ratio, -1, 1))) / alpha,
                   np.nan)
 
-fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
-vmax_img = 0.55
-for ax, img, title in zip(axes[:2],
-                           [img_a, img_2a],
-                           [f'S(α={int(alpha)}°)', f'S(2α={int(2*alpha)}°)']):
-    ax.imshow(img, cmap='gray', vmin=0, vmax=vmax_img, interpolation='bilinear')
-    ax.set_title(title, fontsize=10); ax.axis('off')
-
-im = axes[2].imshow(B1_dam, cmap='RdBu_r', vmin=0.7, vmax=1.3,
-                    interpolation='bilinear')
-axes[2].set_title('DAM B1 map', fontsize=10); axes[2].axis('off')
-div = make_axes_locatable(axes[2])
-cax = div.append_axes('right', size='5%', pad=0.04)
-plt.colorbar(im, cax=cax, label='B1 factor')
-
-fig.suptitle(f'DAM Brain Maps  (α_nom = {int(alpha)}°, TR = {int(TR)} ms)',
-             fontsize=11, y=1.02)
-plt.tight_layout()
-plt.show()
+titles = [f'S(α={int(alpha)}°)', f'S(2α={int(2*alpha)}°)', 'DAM B1 map']
+fig = make_subplots(rows=1, cols=3, subplot_titles=titles, horizontal_spacing=0.06)
+for i, img in enumerate([img_a, img_2a], 1):
+    fig.add_trace(go.Heatmap(z=np.flipud(img), colorscale='gray',
+                             zmin=0, zmax=0.55, showscale=False), row=1, col=i)
+fig.add_trace(go.Heatmap(z=np.flipud(B1_dam), colorscale='RdBu',
+                         zmin=0.7, zmax=1.3, showscale=True,
+                         colorbar=dict(title='B1 factor', len=0.75, thickness=15)),
+              row=1, col=3)
+fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+fig.update_layout(
+    title=dict(text=f'DAM Brain Maps  (α_nom = {int(alpha)}°, TR = {int(TR)} ms)', x=0.5),
+    height=320, template='plotly_white',
+)
+fig.show()
 ```
 
 The centre-bright B1 pattern characteristic of 3 T is clearly visible:
