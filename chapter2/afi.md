@@ -337,6 +337,92 @@ operation. Gaussian smoothing of the B1 map is often applied in practice,
 since B1 varies smoothly over the scale of the RF wavelength and is not
 expected to show sharp spatial features.
 
+## Example Brain Maps
+
+A simulated AFI acquisition on a 3 T brain phantom demonstrates the
+two interleaved SPGR images and the resulting B1 map.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(1)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    B1=np.where(mb, 1.0+0.22*np.exp(-4.0*(dx**2+dy**2)), 0.0)
+    return t, mb, B1
+
+T1v={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask, B1m = brain_phantom()
+T1m = np.vectorize(T1v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+
+TR1, TR2, fa_nom = 20.0, 100.0, 60.0   # ms, ms, degrees
+n_afi = TR1 / TR2
+fa_true = np.radians(fa_nom * B1m)
+
+E1 = np.exp(-TR1 / np.where(T1m > 0, T1m, 1))
+E2 = np.exp(-TR2 / np.where(T1m > 0, T1m, 1))
+
+S1 = PDm * np.sin(fa_true) * (1 - E2) / (1 - E1 * E2 * np.cos(fa_true) + 1e-10)
+S2 = PDm * np.sin(fa_true) * (1 - E1) / (1 - E1 * E2 * np.cos(fa_true) + 1e-10)
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+img_s1 = rician(S1 * bmask, 0.02)
+img_s2 = rician(S2 * bmask, 0.02)
+
+r = img_s1 / np.where(bmask & (img_s2 > 0.005), img_s2, np.nan)
+arg = np.clip((r * n_afi - 1) / (n_afi - r + 1e-10), -1, 1)
+B1_afi = np.where(bmask, np.degrees(np.arccos(arg)) / fa_nom, np.nan)
+
+fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
+for ax, img, title in zip(axes[:2],
+                           [img_s1, img_s2],
+                           [f'S₁  (TR₁={int(TR1)} ms)', f'S₂  (TR₂={int(TR2)} ms)']):
+    ax.imshow(img, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+    ax.set_title(title, fontsize=10); ax.axis('off')
+
+im = axes[2].imshow(B1_afi, cmap='RdBu_r', vmin=0.7, vmax=1.3,
+                    interpolation='bilinear')
+axes[2].set_title('AFI B1 map', fontsize=10); axes[2].axis('off')
+div = make_axes_locatable(axes[2])
+cax = div.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im, cax=cax, label='B1 factor')
+
+fig.suptitle(f'AFI Brain Maps  (α_nom = {int(fa_nom)}°, TR₁ = {int(TR1)} ms,'
+             f' TR₂ = {int(TR2)} ms)', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+The S₁ image (short TR) has strong T1 weighting, while S₂ (long TR)
+is closer to PD-weighted. Both images have the same flip angle and
+hence the same B1 spatial pattern embedded in their signal level.
+Forming the ratio $r = S_1/S_2$ and inverting Eq. [%s](eq-afi-ratio)
+isolates the B1 field, which matches the known centre-bright phantom
+input.
+
 ## References
 
 ```{bibliography}

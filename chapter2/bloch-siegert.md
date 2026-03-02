@@ -368,6 +368,86 @@ The right panel compares the raw and Gaussian-smoothed B1 maps against
 the ground truth: smoothing exploits the known spatial smoothness of B1
 to suppress noise without introducing significant bias.
 
+## Example Brain Maps
+
+A simulated Bloch-Siegert acquisition shows the anatomy-weighted
+magnitude image, the BS phase difference map, and the recovered B1 map.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(2)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    B1=np.where(mb, 1.0+0.22*np.exp(-4.0*(dx**2+dy**2)), 0.0)
+    return t, mb, B1
+
+T1v={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+T2v={0:0,1:0,3:100, 4:75,  5:85,  6:80,  7:1500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask, B1m = brain_phantom()
+T1m = np.vectorize(T1v.get)(tissue).astype(float)
+T2m = np.vectorize(T2v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+
+KBS = 18.0   # normalised KBS constant
+phi_plus  = KBS * B1m**2 + rng.normal(0, 0.04, B1m.shape)
+phi_minus = -KBS * B1m**2 + rng.normal(0, 0.04, B1m.shape)
+phi_diff  = (phi_plus - phi_minus) * bmask
+B1_bs = np.where(bmask, np.sqrt(np.maximum(phi_diff, 0) / (2 * KBS)), np.nan)
+
+img_mag = PDm * np.exp(-80. / np.where(T2m > 0, T2m, 1)) * bmask
+re = img_mag + rng.normal(0, 0.02, img_mag.shape)
+im_noise = rng.normal(0, 0.02, img_mag.shape)
+img_mag_n = np.sqrt(re**2 + im_noise**2)
+
+fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
+axes[0].imshow(img_mag_n, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+axes[0].set_title('Magnitude image', fontsize=10); axes[0].axis('off')
+
+pd_show = np.where(bmask, phi_diff, np.nan)
+im2 = axes[1].imshow(pd_show, cmap='bwr', vmin=-2*KBS, vmax=2*KBS,
+                     interpolation='bilinear')
+axes[1].set_title('BS phase difference (rad)', fontsize=10); axes[1].axis('off')
+div1 = make_axes_locatable(axes[1])
+cax1 = div1.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im2, cax=cax1, label='rad')
+
+im3 = axes[2].imshow(B1_bs, cmap='RdBu_r', vmin=0.7, vmax=1.3,
+                     interpolation='bilinear')
+axes[2].set_title('BS B1 map', fontsize=10); axes[2].axis('off')
+div2 = make_axes_locatable(axes[2])
+cax2 = div2.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im3, cax=cax2, label='B1 factor')
+
+fig.suptitle(f'Bloch-Siegert Brain Maps', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+The phase difference map (centre panel) directly encodes B1²: the
+centre of the brain, where B1 is highest (~1.22), shows the largest
+phase accumulation. The B1 map (right) recovers the spatial field
+pattern via $\sqrt{\Delta\Phi / (2K_\text{BS})}$, with excellent
+agreement to the known phantom input.
+
 ## References
 
 ```{bibliography}

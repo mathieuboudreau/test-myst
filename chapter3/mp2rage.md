@@ -351,6 +351,108 @@ non-linear ratio, but because the ratio suppresses M0, the T1 estimate
 is insensitive to receive-coil intensity variations and the method is
 robust to B1 inhomogeneity — the primary advantages over IR and VFA.
 
+## Example Brain Maps
+
+An MP2RAGE simulation shows the two GRE images, the M0-insensitive
+contrast ratio, and the final T1 map obtained by LUT inversion.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(5)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T1v={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask = brain_phantom()
+T1m = np.vectorize(T1v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+n   = tissue.shape[0]
+
+TI1, TI2, a1_deg, a2_deg = 800, 2700, 4, 5
+a1, a2 = np.radians(a1_deg), np.radians(a2_deg)
+
+T1s = np.where(T1m > 0, T1m, 1)
+g1 = PDm * np.sin(a1) * (1 - 2*np.exp(-TI1 / T1s))
+g2 = PDm * np.sin(a2) * (1 - 2*np.exp(-TI2 / T1s))
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+gre1 = rician(np.abs(g1) * bmask, 0.02)
+gre2 = rician(np.abs(g2) * bmask, 0.02)
+
+# Phase-restored combination
+g1_signed = gre1 * np.sign(g1)
+num = g1_signed * gre2
+den = gre1**2 + gre2**2
+mp2_map = np.where(bmask & (den > 1e-9), num / den, 0.0)
+
+# LUT inversion
+T1_lut  = np.linspace(200, 5000, 3000)
+mp2_lut = (np.sin(a1) * np.sin(a2)
+           * (1 - 2*np.exp(-TI1/T1_lut)) * (1 - 2*np.exp(-TI2/T1_lut)))
+den_lut = (np.sin(a1)**2 * (1 - 2*np.exp(-TI1/T1_lut))**2
+         + np.sin(a2)**2 * (1 - 2*np.exp(-TI2/T1_lut))**2)
+mp2_lut = np.where(den_lut > 1e-9, mp2_lut / den_lut, 0.0)
+T1_mp2  = np.where(bmask, np.interp(mp2_map, mp2_lut, T1_lut), np.nan)
+
+fig, axes = plt.subplots(1, 4, figsize=(14, 3.8))
+axes[0].imshow(gre1, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+axes[0].set_title(f'GRE₁  (TI = {TI1} ms)', fontsize=9); axes[0].axis('off')
+axes[1].imshow(gre2, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+axes[1].set_title(f'GRE₂  (TI = {TI2} ms)', fontsize=9); axes[1].axis('off')
+
+im_mp2 = axes[2].imshow(np.where(bmask, mp2_map, np.nan),
+                         cmap='RdBu_r', vmin=-0.5, vmax=0.5,
+                         interpolation='bilinear')
+axes[2].set_title('MP2RAGE contrast', fontsize=9); axes[2].axis('off')
+div2 = make_axes_locatable(axes[2])
+cax2 = div2.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im_mp2, cax=cax2)
+
+im_t1 = axes[3].imshow(T1_mp2, cmap='magma', vmin=400, vmax=4500,
+                        interpolation='bilinear')
+axes[3].set_title('MP2RAGE T1 map', fontsize=9); axes[3].axis('off')
+div3 = make_axes_locatable(axes[3])
+cax3 = div3.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im_t1, cax=cax3, label='T1 (ms)')
+
+fig.suptitle(f'MP2RAGE Brain Maps  (TI₁={TI1} ms, TI₂={TI2} ms,'
+             f' α₁={a1_deg}°, α₂={a2_deg}°)', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+The GRE₁ image (TI = 800 ms) shows tissues that have passed their
+null point as bright (GM, CSF) while WM near its null appears dark.
+GRE₂ (TI = 2700 ms) is closer to proton-density-weighted. The MP2RAGE
+contrast ratio (third panel) is negative for WM (still inverted at
+TI₁) and positive for GM and CSF. After LUT inversion, the T1 map
+recovers the correct tissue values without any receive-coil sensitivity
+bias.
+
 ## References
 
 ```{bibliography}

@@ -302,6 +302,83 @@ estimates even at modest SNR. However, the absolute MTR values depend
 on the chosen TR and flip angle, underscoring the need for standardised
 protocols when comparing MTR across sites or time points.
 
+## Example Brain Maps
+
+Unsaturated and MT-saturated SPGR images are simulated and the
+pixelwise MTR map is computed.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(9)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T1v  ={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv  ={0:0,1:0,3:0.85,4:0.75,5:0.80, 6:0.78,7:1.00}
+MTRv ={0:0,1:0,3:35,  4:44,  5:40,   6:38,  7:2}    # percent
+tissue, bmask = brain_phantom()
+T1m   = np.vectorize(T1v.get)(tissue).astype(float)
+PDm   = np.vectorize(PDv.get)(tissue).astype(float)
+MTRtm = np.vectorize(MTRv.get)(tissue).astype(float) / 100.0
+
+TR, fa_deg = 28.0, 15.0
+fa  = np.radians(fa_deg)
+E1m = np.exp(-TR / np.where(T1m > 0, T1m, 1))
+S0_ref = PDm * np.sin(fa) * (1 - E1m) / (1 - E1m * np.cos(fa) + 1e-10)
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+img_s0  = rician(S0_ref * bmask, 0.020)
+img_smt = rician(S0_ref * (1 - MTRtm) * bmask, 0.020)
+MTR_map = np.where(bmask & (img_s0 > 0.01),
+                   (1 - img_smt / img_s0) * 100, np.nan)
+
+fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
+axes[0].imshow(img_s0,  cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+axes[0].set_title('S₀ (no saturation)', fontsize=10); axes[0].axis('off')
+axes[1].imshow(img_smt, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+axes[1].set_title('S_MT (with saturation)', fontsize=10); axes[1].axis('off')
+im = axes[2].imshow(MTR_map, cmap='viridis', vmin=0, vmax=60,
+                    interpolation='bilinear')
+axes[2].set_title('MTR map', fontsize=10); axes[2].axis('off')
+div = make_axes_locatable(axes[2])
+cax = div.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im, cax=cax, label='MTR (%)')
+
+fig.suptitle(f'MTR Brain Maps  (TR = {int(TR)} ms, α = {int(fa_deg)}°)',
+             fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+The MT-saturated image (S_MT) has lower overall signal than S₀, with
+WM showing the greatest attenuation (highest MTR ≈ 44%) due to its
+dense myelin-associated macromolecular pool. CSF has virtually no MT
+effect (MTR ≈ 2%). The MTR map clearly delineates WM from GM and CSF,
+making it sensitive to myelin-related pathology.
+
 ## References
 
 ```{bibliography}

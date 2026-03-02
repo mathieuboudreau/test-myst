@@ -376,6 +376,100 @@ offset-frequency dependence and the power dependence are sampled.
 In practice, fitting is regularised and the T1 map is often supplied
 as a fixed input rather than a free parameter.
 
+## Example Brain Maps
+
+The following shows a simulated qMT acquisition represented by its MTR
+surrogate, alongside the two key qMT parameters: the bound pool
+fraction $F$ and the free-pool relaxation rate $R_1^a = 1/T_1^a$.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(10)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T1v ={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv ={0:0,1:0,3:0.85,4:0.75,5:0.80, 6:0.78,7:1.00}
+# qMT parameters typical at 3T
+Fv  ={0:0,1:0,3:0.065,4:0.130,5:0.100,6:0.095,7:0.002}  # F = f_b/(1+f_b)
+MTRv={0:0,1:0,3:35,   4:44,   5:40,   6:38,   7:2}       # percent
+tissue, bmask = brain_phantom()
+T1m  = np.vectorize(T1v.get)(tissue).astype(float)
+PDm  = np.vectorize(PDv.get)(tissue).astype(float)
+Fm   = np.vectorize(Fv.get)(tissue).astype(float)
+MTRtm= np.vectorize(MTRv.get)(tissue).astype(float) / 100.0
+
+TR, fa_deg = 28.0, 15.0
+fa  = np.radians(fa_deg)
+E1m = np.exp(-TR / np.where(T1m > 0, T1m, 1))
+S0  = PDm * np.sin(fa) * (1 - E1m) / (1 - E1m * np.cos(fa) + 1e-10)
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+img_s0  = rician(S0 * bmask, 0.020)
+img_smt = rician(S0 * (1 - MTRtm) * bmask, 0.020)
+MTR_map = np.where(bmask & (img_s0 > 0.01), (1 - img_smt/img_s0)*100, np.nan)
+
+# Fitted F map: ground truth + noise
+F_fit = np.where(bmask, Fm + rng.normal(0, 0.004, Fm.shape), np.nan)
+R1a_fit = np.where(bmask, 1000.0/T1m + rng.normal(0, 0.02, T1m.shape), np.nan)
+
+fig, axes = plt.subplots(1, 3, figsize=(11, 3.8))
+im0 = axes[0].imshow(MTR_map, cmap='viridis', vmin=0, vmax=60,
+                     interpolation='bilinear')
+axes[0].set_title('MTR (%)', fontsize=10); axes[0].axis('off')
+div0 = make_axes_locatable(axes[0])
+cax0 = div0.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im0, cax=cax0, label='MTR (%)')
+
+im1 = axes[1].imshow(F_fit, cmap='plasma', vmin=0, vmax=0.18,
+                     interpolation='bilinear')
+axes[1].set_title('qMT  F  (bound pool fraction)', fontsize=9); axes[1].axis('off')
+div1 = make_axes_locatable(axes[1])
+cax1 = div1.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im1, cax=cax1, label='F')
+
+im2 = axes[2].imshow(R1a_fit, cmap='hot', vmin=0.1, vmax=1.8,
+                     interpolation='bilinear')
+axes[2].set_title('qMT  R₁ᵃ  (s⁻¹)', fontsize=10); axes[2].axis('off')
+div2 = make_axes_locatable(axes[2])
+cax2 = div2.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im2, cax=cax2, label='R₁ᵃ (s⁻¹)')
+
+fig.suptitle('qMT Brain Maps', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+The bound pool fraction $F$ (centre) is highest in WM (~13%) due to
+the dense myelin bilayers, lower in GM (~6.5%), and near-zero in CSF
+(~0.2%). The free-pool $R_1^a = 1/T_{1a}$ (right) is also highest in
+WM and lowest in CSF, reflecting the close coupling between $T_1$,
+myelin content, and the MT exchange rate. These two parameter maps
+together are the most sensitive qMT biomarkers for myelin integrity.
+
 ## References
 
 ```{bibliography}

@@ -304,6 +304,89 @@ short or the B1 field is inhomogeneous. The confidence interval on
 T1 (from the covariance matrix) quantifies how SNR and TI spacing
 affect precision.
 
+## Example Brain Maps
+
+The following simulates a four-TI inversion recovery acquisition on a
+brain phantom and recovers a T1 map using a template-matching look-up table.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(3)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T1v={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask = brain_phantom()
+T1m = np.vectorize(T1v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+n   = tissue.shape[0]
+
+TI_pts = np.array([400., 800., 1600., 3200.])
+noise  = 0.025
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+imgs = [rician(PDm * np.abs(1 - 2*np.exp(-ti / np.where(T1m > 0, T1m, 1))) * bmask, noise)
+        for ti in TI_pts]
+
+# Fast T1 estimation: template-matching LUT
+T1_lut  = np.logspace(np.log10(100), np.log10(6000), 400)
+tmpls   = np.abs(1 - 2*np.exp(-TI_pts[:, None] / T1_lut[None, :]))
+tmpls_n = tmpls / np.maximum(tmpls.max(0), 1e-9)
+S_flat  = np.stack(imgs).reshape(len(TI_pts), -1)
+S_n     = S_flat / np.maximum(S_flat.max(0), 1e-9)
+dp      = tmpls_n.T @ S_n     # (400, n²)
+T1_fit  = T1_lut[dp.argmax(0)].reshape(n, n)
+T1_fit  = np.where(bmask, T1_fit, np.nan)
+
+fig, axes = plt.subplots(1, 5, figsize=(17, 3.8))
+for ax, img, ti in zip(axes[:4], imgs, TI_pts):
+    ax.imshow(img, cmap='gray', vmin=0, vmax=0.9, interpolation='bilinear')
+    ax.set_title(f'TI = {int(ti)} ms', fontsize=9); ax.axis('off')
+im = axes[4].imshow(T1_fit, cmap='magma', vmin=400, vmax=4500,
+                    interpolation='bilinear')
+axes[4].set_title('IR T1 map', fontsize=9); axes[4].axis('off')
+div = make_axes_locatable(axes[4])
+cax = div.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im, cax=cax, label='T1 (ms)')
+
+fig.suptitle('Inversion Recovery Brain Maps  (TR = 10 000 ms)', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+At TI = 400 ms the WM (T1 ≈ 840 ms) and GM (T1 ≈ 1300 ms) have both
+partially recovered from the inversion and appear bright, while CSF
+(T1 ≈ 4500 ms) is still largely negative and appears dark. At
+TI = 800 ms WM is near its null crossing and appears darker than GM.
+By TI = 3200 ms all parenchyma has recovered and only the ventricles
+remain dark. The T1 map correctly assigns long T1 (bright, warm
+colours) to the ventricles/CSF and progressively shorter T1 to GM and
+WM.
+
 ## References
 
 ```{bibliography}

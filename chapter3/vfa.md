@@ -324,6 +324,103 @@ true T1 with RMSE driven primarily by noise. This comparison
 underscores that B1 maps are not optional in VFA — they are a
 fundamental prerequisite.
 
+## Example Brain Maps
+
+A three-flip-angle VFA acquisition is simulated with the centre-bright
+3 T B1 field. Two T1 maps are reconstructed — one ignoring B1, one
+correcting for it — to show the spatial bias introduced by B1
+inhomogeneity.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(4)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    B1=np.where(mb, 1.0+0.22*np.exp(-4.0*(dx**2+dy**2)), 0.0)
+    return t, mb, B1
+
+T1v={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask, B1m = brain_phantom()
+T1m = np.vectorize(T1v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+n   = tissue.shape[0]
+
+FA_deg = np.array([3., 10., 20.])
+FA_rad = np.radians(FA_deg)
+TR = 20.0
+
+E1m = np.exp(-TR / np.where(T1m > 0, T1m, 1))
+
+def spgr(fa_rad, E1, PD):
+    return PD * np.sin(fa_rad) * (1 - E1) / (1 - E1 * np.cos(fa_rad) + 1e-10)
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+# Acquire: actual FA = B1 * nominal FA
+imgs = [rician(spgr(f * B1m, E1m, PDm) * bmask, 0.020) for f in FA_rad]
+
+def vfa_t1(imgs, FA_rad_used, TR):
+    """Vectorised Deoni linearisation."""
+    y = np.stack([imgs[i] / np.sin(FA_rad_used[i]) for i in range(len(imgs))])
+    x = np.stack([imgs[i] / np.tan(FA_rad_used[i]) for i in range(len(imgs))])
+    xm = x.mean(0); ym = y.mean(0)
+    xc = x - xm;    yc = y - ym
+    E1 = np.clip((xc * yc).sum(0) / np.maximum((xc**2).sum(0), 1e-9), 1e-6, 1 - 1e-6)
+    return np.where(bmask, -TR / np.log(E1), np.nan)
+
+# Without B1 correction: assume FA = nominal
+T1_no_b1   = np.clip(vfa_t1(imgs, FA_rad, TR), 100, 6000)
+# With B1 correction: use measured B1m to correct flip angles
+T1_with_b1 = np.clip(vfa_t1(imgs, FA_rad * B1m[np.newaxis, ...], TR), 100, 6000)
+
+fig, axes = plt.subplots(1, 5, figsize=(17, 3.8))
+for ax, img, fa in zip(axes[:3], imgs, FA_deg):
+    ax.imshow(img, cmap='gray', vmin=0, vmax=0.50, interpolation='bilinear')
+    ax.set_title(f'α = {int(fa)}°', fontsize=9); ax.axis('off')
+
+for ax, data, title in zip(axes[3:],
+                            [T1_no_b1, T1_with_b1],
+                            ['VFA T1 (no B1 corr.)', 'VFA T1 (B1 corrected)']):
+    im = ax.imshow(data, cmap='magma', vmin=400, vmax=4500, interpolation='bilinear')
+    ax.set_title(title, fontsize=9); ax.axis('off')
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size='5%', pad=0.04)
+    plt.colorbar(im, cax=cax, label='T1 (ms)')
+
+fig.suptitle(f'VFA Brain Maps  (TR = {int(TR)} ms, α = {list(FA_deg.astype(int))}°)',
+             fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+The uncorrected T1 map (fourth panel) shows a concentric ring artefact:
+T1 is under-estimated at the brain centre (where B1 > 1 inflates the
+effective flip angle) and over-estimated at the periphery (where B1 < 1).
+After B1 correction (fifth panel) the T1 values are uniform within each
+tissue, consistent with the known phantom ground truth.
+
 ## References
 
 ```{bibliography}

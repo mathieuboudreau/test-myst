@@ -388,6 +388,100 @@ closed-form nature of the Helms approximation makes MTsat computationally
 efficient — the entire map is computed in milliseconds — which is a
 significant practical advantage over iterative qMT fitting.
 
+## Example Brain Maps
+
+Three weighted images (PD-w, T1-w, MT-w) are simulated and the Helms
+MTsat formula is applied to produce the MTsat map.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(11)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T1v   ={0:0,1:0,3:1300,4:840, 5:1200,6:1100,7:4500}
+PDv   ={0:0,1:0,3:0.85,4:0.75,5:0.80, 6:0.78,7:1.00}
+MTsatv={0:0,1:0,3:1.8, 4:2.2, 5:2.0,  6:1.9, 7:0.05}  # percent
+tissue, bmask = brain_phantom()
+T1m    = np.vectorize(T1v.get)(tissue).astype(float)
+PDm    = np.vectorize(PDv.get)(tissue).astype(float)
+MTsatm = np.vectorize(MTsatv.get)(tissue).astype(float) / 100.0  # fraction
+
+def spgr(TR, fa_deg, T1, PD):
+    fa  = np.radians(fa_deg)
+    E1  = np.exp(-TR / np.where(T1 > 0, T1, 1))
+    return PD * np.sin(fa) * (1 - E1) / (1 - E1 * np.cos(fa) + 1e-10)
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+# Three weighted acquisitions (Helms 2008 protocol)
+TR_pd, fa_pd = 20.0, 6.0    # PD-weighted
+TR_t1, fa_t1 = 20.0, 20.0   # T1-weighted
+TR_mt, fa_mt = 28.0, 6.0    # MT-weighted
+
+S_pd = rician(spgr(TR_pd, fa_pd, T1m, PDm) * bmask, 0.010)
+S_t1 = rician(spgr(TR_t1, fa_t1, T1m, PDm) * bmask, 0.010)
+# MT-weighted: same as S_pd but with MT saturation applied
+S_mt = rician(spgr(TR_mt, fa_mt, T1m, PDm) * (1 - MTsatm) * bmask, 0.010)
+
+# Helms MTsat formula (approximate, for small flip angles)
+fa_mt_rad = np.radians(fa_mt); fa_pd_rad = np.radians(fa_pd)
+R1_approx = np.where(bmask & (S_t1 > 0.005) & (S_pd > 0.005),
+                     0.5 * (fa_t1**2 / TR_t1 - fa_pd_rad**2 / TR_pd)
+                     / (S_pd / S_t1 - 1) / 1000.0, np.nan)  # s^{-1}
+A_approx  = np.where(bmask, S_pd * (TR_pd * R1_approx + fa_pd_rad**2 / 2), np.nan)
+MTsat_map = np.where(bmask & (A_approx > 0.0001),
+                     (A_approx / S_mt - 1 - TR_mt * R1_approx
+                      - fa_mt_rad**2 / 2) * 100, np.nan)
+MTsat_map = np.clip(MTsat_map, 0, 5)
+
+fig, axes = plt.subplots(1, 4, figsize=(14, 3.8))
+for ax, img, title in zip(axes[:3],
+                           [S_pd, S_t1, S_mt],
+                           ['S_PD  (PD-w)', 'S_T1  (T1-w)', 'S_MT  (MT-w)']):
+    ax.imshow(img, cmap='gray', vmin=0, vmax=0.5, interpolation='bilinear')
+    ax.set_title(title, fontsize=10); ax.axis('off')
+
+im = axes[3].imshow(MTsat_map, cmap='YlOrRd', vmin=0, vmax=3.5,
+                    interpolation='bilinear')
+axes[3].set_title('MTsat map', fontsize=10); axes[3].axis('off')
+div = make_axes_locatable(axes[3])
+cax = div.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im, cax=cax, label='MTsat (%)')
+
+fig.suptitle('MTsat Brain Maps  (three-contrast Helms protocol)', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+WM has the highest MTsat (~2.2%) due to its myelin content, while CSF
+is near zero (~0.05%). Compared to MTR, the MTsat map is less sensitive
+to variations in T1 and TR/flip-angle — visible, for instance, as the
+absence of the concentric intensity gradient that would appear in MTR if
+B1 were inhomogeneous.
+
 ## References
 
 ```{bibliography}

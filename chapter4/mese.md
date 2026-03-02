@@ -288,6 +288,84 @@ accurately. The log-linear approach is faster but biased toward early
 echoes (high SNR); NLS weights all echoes equally and returns a
 confidence interval. For multi-component fitting, NLS is required.
 
+## Example Brain Maps
+
+A six-echo MESE acquisition is simulated on the brain phantom.
+A vectorised log-linear fit recovers the T2 map.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(6)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T2v={0:0,1:0,3:100,4:75,5:85,6:80,7:1500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask = brain_phantom()
+T2m = np.vectorize(T2v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+n   = tissue.shape[0]
+
+TE_pts = np.array([15., 30., 60., 90., 120., 150.])
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+imgs = [rician(PDm * np.exp(-te / np.where(T2m > 0, T2m, 1)) * bmask, 0.025)
+        for te in TE_pts]
+
+# Vectorised log-linear T2 fit across all pixels simultaneously
+S_log  = np.log(np.maximum(np.stack(imgs).reshape(len(TE_pts), -1), 1e-6))
+X      = np.column_stack([np.ones(len(TE_pts)), TE_pts])
+Xpinv  = np.linalg.pinv(X)          # (2, N_TE)
+coeffs = Xpinv @ S_log              # (2, n²)
+T2_fit = np.where(bmask, np.clip(-1.0 / coeffs[1].reshape(n, n), 10, 3000), np.nan)
+
+show_idx = [0, 1, 3, 5]   # TE = 15, 30, 90, 150 ms
+fig, axes = plt.subplots(1, 5, figsize=(17, 3.8))
+for ax, k in zip(axes[:4], show_idx):
+    ax.imshow(imgs[k], cmap='gray', vmin=0, vmax=0.90, interpolation='bilinear')
+    ax.set_title(f'TE = {int(TE_pts[k])} ms', fontsize=9); ax.axis('off')
+
+im = axes[4].imshow(T2_fit, cmap='inferno', vmin=30, vmax=300,
+                    interpolation='bilinear')
+axes[4].set_title('MESE T2 map', fontsize=9); axes[4].axis('off')
+div = make_axes_locatable(axes[4])
+cax = div.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im, cax=cax, label='T2 (ms)')
+
+fig.suptitle('MESE Brain Maps  (TE spacing = 15 ms)', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+Signal decays fastest in WM (T2 ≈ 75 ms): by TE = 150 ms WM is nearly
+invisible while CSF (T2 ≈ 1500 ms) remains bright. The T2 map shows
+the expected tissue hierarchy: ventricles (yellow, ~1500 ms),
+GM (warm orange, ~100 ms) and WM (dark, ~75 ms), with the basal
+ganglia and thalamus at intermediate values.
+
 ## References
 
 ```{bibliography}

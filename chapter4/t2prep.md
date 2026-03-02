@@ -317,6 +317,84 @@ time. The constraint that B1-insensitive adiabatic pulses are used in
 the module means T2prep results are more robust to transmit field
 inhomogeneity than MESE at high field strength.
 
+## Example Brain Maps
+
+Five T2prep images at increasing durations are simulated and a
+vectorised log-linear fit recovers the T2 map.
+
+```{code-cell} python
+:tags: [hide-input]
+
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+rng = np.random.default_rng(8)
+
+def brain_phantom(n=180):
+    y_i, x_i = np.mgrid[:n, :n]
+    cx, cy = n*0.5, n*0.5
+    dx = (x_i - cx) / (n*0.46); dy = (y_i - cy) / (n*0.42)
+    def ell(ax, ay, dx0=0., dy0=0.):
+        return ((dx+dx0)/ax)**2 + ((dy+dy0)/ay)**2 < 1.0
+    mh=ell(1.00,1.00); mb=ell(0.93,0.91); mw=ell(0.76,0.74)
+    mvl=ell(0.17,0.11,-0.30,0); mvr=ell(0.17,0.11,+0.30,0)
+    mbl=ell(0.12,0.10,-0.38,-0.20); mbr=ell(0.12,0.10,+0.38,-0.20)
+    mtl=ell(0.11,0.09,-0.13,-0.09); mtr_=ell(0.11,0.09,+0.13,-0.09)
+    t=np.zeros((n,n),dtype=int)
+    t[mh]=1; t[mb]=3; t[mw]=4; t[mbl|mbr]=5; t[mtl|mtr_]=6; t[mvl|mvr]=7
+    return t, mb
+
+T2v={0:0,1:0,3:100,4:75,5:85,6:80,7:1500}
+PDv={0:0,1:0,3:0.85,4:0.75,5:0.80,6:0.78,7:1.00}
+tissue, bmask = brain_phantom()
+T2m = np.vectorize(T2v.get)(tissue).astype(float)
+PDm = np.vectorize(PDv.get)(tissue).astype(float)
+n   = tissue.shape[0]
+
+tau_pts = np.array([0., 24., 48., 72., 96.])
+
+def rician(img, s):
+    re = img + rng.normal(0, s, img.shape)
+    im = rng.normal(0, s, img.shape)
+    return np.sqrt(re**2 + im**2)
+
+imgs = [rician(PDm * np.exp(-tau / np.where(T2m > 0, T2m, 1)) * bmask, 0.025)
+        for tau in tau_pts]
+
+# Vectorised log-linear T2 fit
+S_log  = np.log(np.maximum(np.stack(imgs).reshape(len(tau_pts), -1), 1e-6))
+X      = np.column_stack([np.ones(len(tau_pts)), tau_pts])
+Xpinv  = np.linalg.pinv(X)
+coeffs = Xpinv @ S_log
+T2_fit = np.where(bmask, np.clip(-1.0 / coeffs[1].reshape(n, n), 10, 3000), np.nan)
+
+fig, axes = plt.subplots(1, 6, figsize=(19, 3.8))
+for ax, img, tau in zip(axes[:5], imgs, tau_pts):
+    ax.imshow(img, cmap='gray', vmin=0, vmax=0.90, interpolation='bilinear')
+    ax.set_title(f'τ = {int(tau)} ms', fontsize=9); ax.axis('off')
+
+im = axes[5].imshow(T2_fit, cmap='inferno', vmin=30, vmax=300,
+                    interpolation='bilinear')
+axes[5].set_title('T2prep T2 map', fontsize=9); axes[5].axis('off')
+div = make_axes_locatable(axes[5])
+cax = div.append_axes('right', size='5%', pad=0.04)
+plt.colorbar(im, cax=cax, label='T2 (ms)')
+
+fig.suptitle('T2prep Brain Maps  (five T2prep durations)', fontsize=11, y=1.02)
+plt.tight_layout()
+plt.show()
+```
+
+At τ = 0 ms the image is PD-weighted with no T2 encoding. As τ
+increases, the WM (shortest T2) signal drops fastest. By τ = 96 ms
+the WM signal has decayed by ~73% while CSF (T2 ≈ 1500 ms) has
+barely changed. The T2 map from only 5 acquisitions matches the
+tissue ground-truth values well, demonstrating the efficiency of
+T2prep for cardiac and neuro protocols.
+
 ## References
 
 ```{bibliography}
