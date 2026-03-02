@@ -54,6 +54,13 @@ project:
         - file: chapter2/afi
         - file: chapter2/bloch-siegert
         - file: chapter2/conclusion
+    - title: Chapter 5 — Magnetization Transfer
+      children:
+        - file: chapter5/index
+        - file: chapter5/mtr
+        - file: chapter5/qmt
+        - file: chapter5/mtsat
+        - file: chapter5/conclusion
 site:
   template: book-theme
   title: Quantitative MRI Course
