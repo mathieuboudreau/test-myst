@@ -57,5 +57,3 @@ project:
 site:
   template: book-theme
   title: Quantitative MRI Course
-  options:
-    favicon: favicon.ico
