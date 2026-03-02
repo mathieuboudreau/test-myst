@@ -116,8 +116,7 @@ axes[3].set_ylim(-0.52, 0.75)
 axes[0].set_title(
     'AFI Pulse Sequence (one TR cycle shown; n = TR₂/TR₁ = 4)', fontsize=11, pad=8)
 plt.tight_layout()
-plt.savefig('chapter2/afi_pulse_sequence.png', dpi=150, bbox_inches='tight')
-plt.show()
+plt.close()
 ```
 
 :::{figure} afi_pulse_sequence.png

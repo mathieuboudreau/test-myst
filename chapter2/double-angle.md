@@ -108,8 +108,7 @@ for col_idx, (label, fa, color) in enumerate([
 
 fig.suptitle('Double Angle Method — Two Spoiled-GRE Acquisitions',
              fontsize=11, y=0.96)
-plt.savefig('chapter2/dam_pulse_sequence.png', dpi=150, bbox_inches='tight')
-plt.show()
+plt.close()
 ```
 
 :::{figure} dam_pulse_sequence.png

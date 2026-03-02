@@ -123,8 +123,7 @@ axes[0].text(0.24, -0.14, 'BS pulse duration τ_p', ha='center',
 
 axes[0].set_title('Bloch-Siegert Shift B1 Mapping Sequence', fontsize=11, pad=8)
 plt.tight_layout()
-plt.savefig('chapter2/bs_pulse_sequence.png', dpi=150, bbox_inches='tight')
-plt.show()
+plt.close()
 ```
 
 :::{figure} bs_pulse_sequence.png
