@@ -1,0 +1,61 @@
+version: 1
+project:
+  id: qmri-course
+  title: Quantitative MRI Course
+  github: https://github.com/mathieuboudreau/test-myst
+  bibliography:
+    - references.bib
+  abbreviations:
+    MRI: Magnetic Resonance Imaging
+    NMR: Nuclear Magnetic Resonance
+    RF: Radiofrequency
+    TR: Repetition Time
+    TE: Echo Time
+    TI: Inversion Time
+    FA: Flip Angle
+    FID: Free Induction Decay
+    SE: Spin Echo
+    GRE: Gradient Echo
+    IR: Inversion Recovery
+    SNR: Signal-to-Noise Ratio
+    CNR: Contrast-to-Noise Ratio
+    qMRI: Quantitative MRI
+    B0: Main Static Magnetic Field
+    B1: Transmitted RF Magnetic Field
+    T1: Longitudinal Relaxation Time
+    T2: Transverse Relaxation Time
+    T2s: Effective Transverse Relaxation Time
+    DAM: Double Angle Method
+    AFI: Actual Flip-angle Imaging
+    BS: Bloch-Siegert Shift
+    FOV: Field of View
+    ROI: Region of Interest
+    SPGR: Spoiled Gradient Recalled Echo
+    VFA: Variable Flip Angle
+    CPMG: Carr-Purcell-Meiboom-Gill
+    ADC: Analog-to-Digital Converter
+    SAR: Specific Absorption Rate
+    CSF: Cerebrospinal Fluid
+    WM: White Matter
+    GM: Gray Matter
+  toc:
+    - file: intro
+    - title: Chapter 1 — A Quick Primer of MRI Physics
+      children:
+        - file: chapter1/index
+        - file: chapter1/spin-echo
+        - file: chapter1/gradient-echo
+        - file: chapter1/inversion-recovery
+        - file: chapter1/conclusion
+    - title: Chapter 2 — B1 Mapping
+      children:
+        - file: chapter2/index
+        - file: chapter2/double-angle
+        - file: chapter2/afi
+        - file: chapter2/bloch-siegert
+        - file: chapter2/conclusion
+site:
+  template: book-theme
+  title: Quantitative MRI Course
+  options:
+    favicon: favicon.ico
