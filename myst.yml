@@ -61,6 +61,13 @@ project:
         - file: chapter3/vfa
         - file: chapter3/mp2rage
         - file: chapter3/conclusion
+    - title: Chapter 4 — T2 Mapping
+      children:
+        - file: chapter4/index
+        - file: chapter4/mese
+        - file: chapter4/megre
+        - file: chapter4/t2prep
+        - file: chapter4/conclusion
     - title: Chapter 5 — Magnetization Transfer
       children:
         - file: chapter5/index
