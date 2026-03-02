@@ -29,18 +29,7 @@ for the echo time TE, then reads out the echo and repeats after TR:
    before the next TR.
 
 ```{code-cell} python
----
-tags: [hide-input]
-mystnb:
-  figure:
-    name: fig-gre-sequence
-    caption: |
-      Spoiled gradient-echo pulse sequence. The small flip angle α excitation is
-      followed by a negative Gx pre-phaser; the positive readout lobe creates a
-      gradient echo at time TE. A spoiler gradient at the end of TR destroys
-      residual transverse magnetisation.
-    align: center
----
+:tags: [hide-input]
 
 import numpy as np
 import matplotlib
@@ -125,6 +114,15 @@ axes[0].set_title('Gradient-Echo (Spoiled GRE) Pulse Sequence Diagram',
 plt.tight_layout()
 plt.show()
 ```
+
+:::{figure} gre_pulse_sequence.png
+:name: fig-gre-sequence
+:align: center
+Spoiled gradient-echo pulse sequence. The small flip angle α excitation is
+followed by a negative Gx pre-phaser; the positive readout lobe creates a
+gradient echo at time TE. A spoiler gradient at the end of TR destroys
+residual transverse magnetisation.
+:::
 
 ## Mathematical Model
 

@@ -30,18 +30,7 @@ Because static B0 offsets are refocused, the echo amplitude decays only with
 the *irreversible* T2, not the faster T2\*.
 
 ```{code-cell} python
----
-tags: [hide-input]
-mystnb:
-  figure:
-    name: fig-se-sequence
-    caption: |
-      Spin-echo pulse sequence timing diagram. The 90° sinc excitation pulse
-      (RF channel) is followed at time $\tau = \text{TE}/2$ by the 180° refocusing
-      pulse. Slice-select gradients (Gz), a phase-encode blip (Gy), a pre-phaser
-      and readout gradient (Gx), and the ADC acquisition window are shown.
-    align: center
----
+:tags: [hide-input]
 
 import numpy as np
 import matplotlib
@@ -124,6 +113,15 @@ axes[0].set_title('Spin-Echo Pulse Sequence Diagram', fontsize=11, pad=8)
 plt.tight_layout()
 plt.show()
 ```
+
+:::{figure} se_pulse_sequence.png
+:name: fig-se-sequence
+:align: center
+Spin-echo pulse sequence timing diagram. The 90° sinc excitation pulse
+(RF channel) is followed at time $\tau = \text{TE}/2$ by the 180° refocusing
+pulse. Slice-select gradients (Gz), a phase-encode blip (Gy), a pre-phaser
+and readout gradient (Gx), and the ADC acquisition window are shown.
+:::
 
 The multi-echo variant — the **CPMG** sequence {cite}`carr1954,meiboom1958` —
 applies a train of 180° pulses at intervals of TE to produce multiple echoes

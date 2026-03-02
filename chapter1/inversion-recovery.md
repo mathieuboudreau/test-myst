@@ -24,18 +24,7 @@ The IR sequence consists of three events:
    the cycle.
 
 ```{code-cell} python
----
-tags: [hide-input]
-mystnb:
-  figure:
-    name: fig-ir-sequence
-    caption: |
-      Inversion recovery pulse sequence. A 180° inversion pulse at $t = 0$ is
-      followed by the inversion time TI, then a 90° readout with standard
-      spin-echo or GRE encoding. The signal depends on how much $M_z$ has
-      recovered during TI.
-    align: center
----
+:tags: [hide-input]
 
 import numpy as np
 import matplotlib
@@ -115,6 +104,15 @@ axes[0].set_title('Inversion Recovery Pulse Sequence Diagram', fontsize=11, pad=
 plt.tight_layout()
 plt.show()
 ```
+
+:::{figure} ir_pulse_sequence.png
+:name: fig-ir-sequence
+:align: center
+Inversion recovery pulse sequence. A 180° inversion pulse at $t = 0$ is
+followed by the inversion time TI, then a 90° readout with standard
+spin-echo or GRE encoding. The signal depends on how much $M_z$ has
+recovered during TI.
+:::
 
 ## Mathematical Model
 
