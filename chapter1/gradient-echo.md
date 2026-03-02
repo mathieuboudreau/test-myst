@@ -112,7 +112,7 @@ axes[3].set_ylim(-0.55, 0.85)
 axes[0].set_title('Gradient-Echo (Spoiled GRE) Pulse Sequence Diagram',
                   fontsize=11, pad=8)
 plt.tight_layout()
-plt.show()
+plt.close()
 ```
 
 :::{figure} gre_pulse_sequence.png

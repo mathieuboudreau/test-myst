@@ -40,7 +40,12 @@ jobs:
       - name: Install MyST CLI
         run: npm install -g mystmd
 
-      - name: Build MyST site (with notebook execution)
+      - name: Execute notebooks
+        run: myst execute
+        env:
+          BASE_URL: /${{ github.event.repository.name }}
+
+      - name: Build MyST site
         run: myst build --html
         env:
           BASE_URL: /${{ github.event.repository.name }}

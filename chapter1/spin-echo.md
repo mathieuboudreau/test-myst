@@ -111,7 +111,7 @@ axes[3].set_ylim(-0.55, 0.8)
 
 axes[0].set_title('Spin-Echo Pulse Sequence Diagram', fontsize=11, pad=8)
 plt.tight_layout()
-plt.show()
+plt.close()
 ```
 
 :::{figure} se_pulse_sequence.png
