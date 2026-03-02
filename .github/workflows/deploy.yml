@@ -2,7 +2,9 @@ name: Deploy MyST Site to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - claude/myst-mri-course-ItIQj
   workflow_dispatch:
 
 permissions:
